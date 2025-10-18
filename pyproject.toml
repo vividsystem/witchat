@@ -1,7 +1,12 @@
 [project]
 name = "ragdoll"
 version = "0.1.0"
-description = "Add your description here"
+description = "An encrypted p2p chat app"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "asyncio>=4.0.0",
+    "kademlia>=2.2.3",
+    "pynacl>=1.6.0",
+    "textual>=6.3.0",
+]
