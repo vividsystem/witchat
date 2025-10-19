@@ -22,10 +22,10 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 async def main():
     print("Welcome to WitchAt!")
     port = int(input("Your host port (default: 8468):") or 8468)
-    bs = input("Input IPs to connect to (format: IP:PORT, ...):")
+    bs = input("Nodes to connect to (format: IP:PORT, ...):")
     bootstrap: list[tuple[str, int]] = [
         (socket.gethostbyname(s[0]), int(s[1]))
-        for x in bs.split(",")
+        for x in bs.strip().replace(" ", "").split(",")
         for s in [x.split(":")]
         if len(s) > 1
     ]
