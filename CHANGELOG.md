@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.2.1 (2025-10-19)
+
+### Continuous Integration
+
+- Added semantic_release config to pyproject.toml
+  ([`03ac1e6`](https://github.com/vividsystem/witchat/commit/03ac1e611a357919a0bc5471e577a45367229b14))
+
+
 ## v0.2.0 (2025-10-19)
 
 ### Chores

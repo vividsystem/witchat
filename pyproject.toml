@@ -16,7 +16,7 @@ patch_tags = ["fix", "perf", "ci", "docs", "chore"]
 
 [project]
 name = "witchat"
-version = "0.1.0"
+version = "0.2.1"
 description = "An encrypted p2p chat app"
 readme = "README.md"
 requires-python = ">=3.13"
