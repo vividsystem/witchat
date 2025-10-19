@@ -1,49 +1,120 @@
-import asyncio
 import base64
+import asyncio
 import json
 from kademlia.network import Server
 from typing import Optional
+from nacl import signing, public
+import ragdoll.crypto as crypto
+
+
+class Contact:
+    def __init__(self, name: str, pk_bytes: bytes, box_pk_bytes: bytes, port: int):
+        self.name = name
+        self.pk_bytes = pk_bytes
+        self.box_pk_bytes = box_pk_bytes
+        self.port = port
+
+    @classmethod
+    def from_json(cls, json_str: str):
+        data = json.loads(json_str)
+
+        pk_bytes = base64.b64decode(data["pk"])
+        box_pk_bytes = base64.b64decode(data["box_pk"])
+
+        return cls(
+            name=data["name"],
+            pk_bytes=pk_bytes,
+            box_pk_bytes=box_pk_bytes,
+            port=data["port"],
+        )
+
+    def blob(self):
+        contact_dict = {
+            "name": self.name,
+            "pk": base64.b64encode(self.pk_bytes).decode(),
+            "box_pk": base64.b64encode(self.box_pk_bytes).decode(),
+            "port": self.port,
+        }
+
+        return json.dumps(contact_dict)
+
+    def fingerprint(self):
+        return crypto.get_fingerprint(self.pk_bytes)
 
 
 class DHTNode:
     def __init__(
-        self, port: int = 8468, bootstrap: Optional[tuple[str, int]] = None, loop=None
+        self,
+        sk: signing.SigningKey,
+        pk: signing.VerifyKey,
+        box_sk: public.PrivateKey,
+        box_pk: public.PublicKey,
+        name: str,
+        port: int = 8468,
+        bootstrap: Optional[list[tuple[str, int]]] = None,
     ):
         self.port = port
         self.server = Server()
-        self.loop = loop or asyncio.get_event_loop()
         self.bootstrap = bootstrap
+        self.name = name
+        self.sk = sk
+        self.pk = pk
+        self.box_sk = box_sk
+        self.box_pk = box_pk
+        self.loop = None
+        self._stop_event = asyncio.Event()
 
-    async def start(self):
+    def run(self):
+        try:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            self.loop.run_until_complete(self.server.listen(self.port))
+            if self.bootstrap:
+                self.loop.run_until_complete(self.server.bootstrap(self.bootstrap))
+            self.loop.run_forever()
+        except Exception as e:
+            print(f"Running DHT an error occured: {e}")
+
+    async def run_async(self):
         await self.server.listen(self.port)
+
         if self.bootstrap:
-            try:
-                await self.server.bootstrap([self.bootstrap])
-            except Exception as e:
-                print(f"DHT Bootstrap failed: {e}")
+            await self.server.bootstrap(self.bootstrap)
+        await self._stop_event.wait()
 
-    async def stop(self):
-        await self.server.stop()
+    def stop(self):
+        self._stop_event.set()
 
-    async def publish_contact(self, fingerprint: str, contact: dict):
-        await self.server.set(f"contact:{fingerprint}", contact)
+    # think of a way to ensure/notify people that key pairs have changed -> other encryption key with same verifykey
+    async def publish_contact(self):
+        contact = Contact(self.name, bytes(self.pk), bytes(self.box_pk), self.port)
+        await self.server.set(f"contact:{self.fingerprint()}", contact.blob())
 
-    async def lookup_contact(self, fingerprint: str) -> Optional[dict]:
+    async def lookup_contact(self, fingerprint: str) -> Optional[Contact]:
         raw = await self.server.get(f"contact:{fingerprint}")
         if raw is None:
             return None
         try:
-            return json.loads(raw)
-        except Exception:
+            return Contact.from_json(raw)
+        except Exception as e:
+            print(f"Error trying to get contact: {e}")
             return None
 
-    async def push_inbox(self, fingerprint: str, envelope_bytes: bytes):
+    # TODO: think of a way to protect this inbox so it doesn't get modified/items deleted by other parties
+    async def push_inbox(
+        self, fingerprint: str, recipient_box_pk: bytes, message: bytes
+    ):
         key = f"inbox:{fingerprint}"
         current = await self.server.get(key)
         try:
             arr = json.loads(current)
         except Exception:
             arr = []
+
+        recipient_box_pk = public.PublicKey(recipient_box_pk)
+        envelope_bytes = crypto.pack_envelope(
+            self.sk, self.box_sk, recipient_box_pk, message
+        )
         arr.append(base64.b64encode(envelope_bytes).decode())
         await self.server.set(key, json.dumps(arr))
 
@@ -54,6 +125,11 @@ class DHTNode:
             arr = json.loads(raw)
         except Exception:
             arr = []
-
+        envelopes = [
+            (crypto.unpack_envelope(base64.b64decode(x), self.box_sk)) for x in arr
+        ]
         await self.server.set(key, json.dumps([]))
-        return [base64.b64decode(x) for x in arr]
+        return envelopes
+
+    def fingerprint(self):
+        return crypto.get_fingerprint(bytes(self.pk))
