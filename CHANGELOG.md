@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.2.2 (2025-10-19)
+
+### Bug Fixes
+
+- Forgot second argument
+  ([`70a0e47`](https://github.com/vividsystem/witchat/commit/70a0e475b17b71db321e6e164c7264ea6669590c))
+
+- Improved input handling to prevent edge cases with spaces
+  ([`e77f7b4`](https://github.com/vividsystem/witchat/commit/e77f7b457d30c79ff79001b86c37802ec022d267))
+
+### Documentation
+
+- Added basic information to README.md
+  ([`5969aaf`](https://github.com/vividsystem/witchat/commit/5969aafaa00bd88db022753c9ec1548afb78226f))
+
+
 ## v0.2.1 (2025-10-19)
 
 ### Continuous Integration
