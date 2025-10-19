@@ -6,7 +6,7 @@ from nacl import signing, public, utils, exceptions
 from nacl.encoding import RawEncoder
 import hashlib
 
-KEYDIR = Path("~/.p2pchat").expanduser()
+KEYDIR = Path("~/.ragdoll").expanduser()
 SK_PATH = KEYDIR / "ed25519_sk"  # signing secret key
 PK_PATH = KEYDIR / "ed25519_pk"  # signing public key
 BOX_SK_PATH = KEYDIR / "box_sk"  # encryption secret key
@@ -25,25 +25,46 @@ def _read(p: Path):
         return f.read()
 
 
+def identity_exists() -> bool:
+    return (
+        SK_PATH.exists()
+        and PK_PATH.exists()
+        and BOX_SK_PATH.exists()
+        and BOX_PK_PATH.exists()
+    )
+
+
 # TODO: add passhprase support/local encryption of keys
-def generate_identity(passphrase: bytes | None = None):
+def generate_identity(
+    passphrase: bytes | None = None,
+) -> (signing.SigningKey, signing.VerifyKey, public.PrivateKey, public.PublicKey):
     # ed25519
     sk = signing.SigningKey.generate()
     pk = sk.verify_key
 
-    _save(SK_PATH, sk.encode())
-    _save(SK_PATH, pk.encode())
-
     box_sk = public.PrivateKey.generate()
     box_pk = box_sk.public_key
-    _save(BOX_SK_PATH, bytes(box_sk))
-    _save(BOX_PK_PATH, bytes(box_pk))
 
     return sk, pk, box_sk, box_pk
 
 
+def save_identity(
+    sk: signing.SigningKey,
+    pk: signing.VerifyKey,
+    box_sk: public.PrivateKey,
+    box_pk: public.PublicKey,
+    passphrase: bytes | None = None,
+):
+    _save(SK_PATH, bytes(sk))
+    _save(SK_PATH, bytes(pk))
+    _save(BOX_SK_PATH, bytes(box_sk))
+    _save(BOX_PK_PATH, bytes(box_pk))
+
+
 # TODO: add passphrase support/local decryption of keys
-def load_identitiy(passphrase: bytes | None = None):
+def load_identitiy(
+    passphrase: bytes | None = None,
+) -> (signing.SigningKey, signing.VerifyKey, public.PrivateKey, public.PublicKey):
     sk_bytes = _read(SK_PATH)
     pk_bytes = _read(PK_PATH)
 
@@ -51,10 +72,10 @@ def load_identitiy(passphrase: bytes | None = None):
     box_pk_bytes = _read(BOX_PK_PATH)
 
     sk = signing.SigningKey(sk_bytes)
-    pk = signing.SigningKey(pk_bytes)
+    pk = signing.VerifyKey(pk_bytes)
 
     box_sk = public.PrivateKey(box_sk_bytes)
-    box_pk = public.PrivateKey(box_pk_bytes)
+    box_pk = public.PublicKey(box_pk_bytes)
 
     return sk, pk, box_sk, box_pk
 
@@ -78,14 +99,15 @@ def verify_signature(vk: signing.VerifyKey, msg: bytes, signature: bytes):
 def pack_envelope(
     sender_signing_sk: signing.SigningKey,
     sender_box_sk: public.PrivateKey,
-    recipient_box_pk: bytes,
+    recipient_box_pk: public.PublicKey,
     plaintext: bytes,
 ):
     box = public.Box(sender_box_sk, recipient_box_pk)
     ciphertext = box.encrypt(plaintext)
 
     header = {
-        "sender_vk": base64.b64encode(sender_signing_sk.verify_key).decode(),
+        "sender_pk": base64.b64encode(bytes(sender_signing_sk.verify_key)).decode(),
+        "sender_box_pk": base64.b64encode(bytes(sender_box_sk.public_key)).decode(),
         "ts": int(time.time()),
     }
 
@@ -103,26 +125,33 @@ def pack_envelope(
 
 def unpack_envelope(
     envelope_bytes: bytes,
-    expected_sender_vk: bytes,
-    sender_box_pk: bytes,
-    box_sk: bytes,
-):
-    box = public.Box(box_sk, sender_box_pk)
+    box_sk: public.PrivateKey,
+) -> (bool, dict, bytes):
     envelope = json.loads(envelope_bytes)
-    vk = signing.VerifyKey(expected_sender_vk)
-
     header_bytes = base64.b64decode(envelope["header"])
     ciphertext = base64.b64decode(envelope["ciphertext"])
     signature = base64.b64decode(envelope["signature"])
 
-    valid = True
     try:
-        vk.verify(header_bytes + ciphertext, signature)
+        header = json.loads(header_bytes)
+    except Exception:
+        return False, None, None
+
+    if "sender_pk" not in header or "sender_box_pk" not in header:
+        return False, None, None
+
+    sender_pk_bytes = base64.b64decode(header["sender_pk"])
+    sender_box_pk_bytes = base64.b64decode(header["sender_box_pk"])
+
+    sender_box_pk = public.PublicKey(sender_box_pk_bytes)
+    box = public.Box(box_sk, sender_box_pk)
+    pk = signing.VerifyKey(sender_pk_bytes)
+
+    try:
+        pk.verify(header_bytes + ciphertext, signature)
     except exceptions.BadSignatureError:
-        valid = False
-        return valid, None, None
+        return False, None, None
 
     plaintext = box.decrypt(ciphertext)
-    header = json.loads(header_bytes)
 
-    return valid, header, plaintext
+    return True, header, plaintext
