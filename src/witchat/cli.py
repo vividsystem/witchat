@@ -1,7 +1,7 @@
 # import logging
 from typing import Optional
-import ragdoll.crypto as crypto
-from ragdoll.dht import DHTNode, Contact
+import witchat.crypto as crypto
+from witchat.dht import DHTNode, Contact
 import asyncio
 import uvloop
 
@@ -17,7 +17,7 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 
 async def main():
-    print("Welcome to Ragdoll!")
+    print("Welcome to WitchAt!")
     port = int(input("Your host port (default: 8468):") or 8468)
     bs = input("Input IPs to connect to (format: IP:PORT, ...):")
     bootstrap: list[tuple[str, int]] = [
@@ -100,4 +100,5 @@ def entrypoint():
 
 
 if __name__ == "__main__":
+    entrypoint()
     entrypoint()

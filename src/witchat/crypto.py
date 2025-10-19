@@ -2,8 +2,7 @@ from pathlib import Path
 import json
 import base64
 import time
-from nacl import signing, public, utils, exceptions
-from nacl.encoding import RawEncoder
+from nacl import signing, public, exceptions
 import hashlib
 
 KEYDIR = Path("~/.ragdoll").expanduser()

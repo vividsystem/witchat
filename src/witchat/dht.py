@@ -4,7 +4,7 @@ import json
 from kademlia.network import Server
 from typing import Optional
 from nacl import signing, public
-import ragdoll.crypto as crypto
+import witchat.crypto as crypto
 
 
 class Contact:
@@ -130,6 +130,9 @@ class DHTNode:
         ]
         await self.server.set(key, json.dumps([]))
         return envelopes
+
+    def fingerprint(self):
+        return crypto.get_fingerprint(bytes(self.pk))
 
     def fingerprint(self):
         return crypto.get_fingerprint(bytes(self.pk))
