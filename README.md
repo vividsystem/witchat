@@ -10,6 +10,7 @@ Theoretically it would be more efficient to use asymetric encryption only for ke
 * python
 * uv (heavily recommended)
 * a friend to chat to (or a second terminal)
+* a desktop os (hopefull something *NIX-based)
 ## Installation
 NOTE: If you truly want to make this truly decentralized and p2p you will have to port-forward to the internet and that's dangerous. If you want to test the potential capabilities try connecting to `vividsystem.hackclub.app:8468`
 

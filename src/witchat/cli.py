@@ -5,11 +5,16 @@ from witchat.dht import DHTNode, Contact
 import socket
 import asyncio
 import uvloop
+import logging
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
+# todo: replace with argparse
+DEBUG = False
+if not DEBUG:
+    logging.getLogger("kademlia").setLevel(logging.CRITICAL)
 
 # handler = logging.StreamHandler()
 # formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
