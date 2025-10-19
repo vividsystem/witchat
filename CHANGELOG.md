@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.2.0 (2025-10-19)
+
+### Chores
+
+- Updated uv.lock
+  ([`be65848`](https://github.com/vividsystem/witchat/commit/be65848b42a7ce202e2ef51819a61e5cd0b65f45))
+
+### Features
+
+- Domain look-up support
+  ([`5de272a`](https://github.com/vividsystem/witchat/commit/5de272a820c6b6d97a1a42cfba0feb21bf006b60))
+
+### Testing
+
+- Added test node
+  ([`b8cde5e`](https://github.com/vividsystem/witchat/commit/b8cde5e99a356d0be3f4ab47d30e8c793eac14f9))
+
+
 ## v0.1.0 (2025-10-19)
 
 ### Bug Fixes
