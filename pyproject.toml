@@ -2,6 +2,18 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.semantic_release]
+commit_parser = "angular"
+upload_to_vcs_release = true
+branch = "master"
+build_command = "uv build"
+version_toml = ["pyproject.toml:project.version"]
+
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat", "refactor"]
+patch_tags = ["fix", "perf", "ci", "docs", "chore"]
+
 [project]
 name = "witchat"
 version = "0.1.0"
