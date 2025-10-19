@@ -3,6 +3,7 @@ import json
 import base64
 import time
 from nacl import signing, public, exceptions
+from typing import Optional
 import hashlib
 
 KEYDIR = Path("~/.ragdoll").expanduser()
@@ -122,35 +123,111 @@ def pack_envelope(
     return json.dumps(envelope).encode()
 
 
-def unpack_envelope(
-    envelope_bytes: bytes,
-    box_sk: public.PrivateKey,
-) -> (bool, dict, bytes):
-    envelope = json.loads(envelope_bytes)
-    header_bytes = base64.b64decode(envelope["header"])
-    ciphertext = base64.b64decode(envelope["ciphertext"])
-    signature = base64.b64decode(envelope["signature"])
+# TODO: secure time to not be alterable without perms
+class Header:
+    def __init__(
+        self,
+        sender_pk: signing.VerifyKey,
+        sender_box_pk: public.PublicKey,
+        ts: int = time.time(),
+    ):
+        self.sender_pk = sender_pk
+        self.sender_box_pk = sender_box_pk
+        self.ts = ts
 
-    try:
+    @classmethod
+    def from_bytes(
+        cls,
+        sender_pk_bytes: bytes,
+        sender_box_pk_bytes: bytes,
+        ts: int = time.time(),
+    ):
+        sender_pk = signing.VerifyKey(sender_pk_bytes)
+        sender_box_pk = public.PublicKey(sender_box_pk_bytes)
+
+        return cls(sender_pk, sender_box_pk, ts)
+
+    @classmethod
+    def unpack(cls, header_bytes: bytes):
         header = json.loads(header_bytes)
-    except Exception:
-        return False, None, None
 
-    if "sender_pk" not in header or "sender_box_pk" not in header:
-        return False, None, None
+        sender_pk_bytes = base64.b64decode(header["sender_pk"])
+        sender_box_pk_bytes = base64.b64decode(header["sender_box_pk"])
 
-    sender_pk_bytes = base64.b64decode(header["sender_pk"])
-    sender_box_pk_bytes = base64.b64decode(header["sender_box_pk"])
+        return cls.from_bytes(
+            sender_pk_bytes, sender_box_pk_bytes, time.gmtime(header["ts"])
+        )
 
-    sender_box_pk = public.PublicKey(sender_box_pk_bytes)
-    box = public.Box(box_sk, sender_box_pk)
-    pk = signing.VerifyKey(sender_pk_bytes)
+    def pack(self):
+        header_bytes = json.dumps(
+            {
+                "sender_pk": base64.b64encode(bytes(self.sender_pk)).decode(),
+                "sender_box_pk": base64.b64encode(bytes(self.sender_box_pk)).decode(),
+                "ts": int(time.time()),
+            }
+        ).encode()
+        return header_bytes
 
-    try:
-        pk.verify(header_bytes + ciphertext, signature)
-    except exceptions.BadSignatureError:
-        return False, None, None
 
-    plaintext = box.decrypt(ciphertext)
+class Envelope:
+    def __init__(
+        self,
+        signature_valid: bool = True,
+        plaintext: Optional[bytes] = None,
+        signature: Optional[bytes] = None,
+        header: Optional[Header] = None,
+    ):
+        self.header = header
+        self.plaintext = plaintext
+        self.signature = signature
+        self.signature_valid = signature_valid
 
-    return True, header, plaintext
+    def pack(
+        self,
+        sk: signing.SigningKey,
+        box_sk: public.PrivateKey,
+        recipient_box_pk: public.PublicKey,
+    ) -> Optional[bytes]:
+        if self.header is None:
+            self.header = Header(sk.verify_key, box_sk.public_key)
+
+        box = public.Box(box_sk, recipient_box_pk)
+        ciphertext = box.encrypt(self.plaintext)
+
+        header_bytes = self.header.pack()
+        (_, signature) = sign_message(sk, header_bytes + ciphertext)
+
+        envelope = {
+            "header": base64.b64encode(header_bytes).decode(),
+            "ciphertext": base64.b64encode(ciphertext).decode(),
+            "signature": base64.b64encode(signature).decode(),
+        }
+
+        return json.dumps(envelope).encode()
+
+    @classmethod
+    def unpack(cls, envelope_bytes: bytes, box_sk: public.PrivateKey):
+        envelope = json.loads(envelope_bytes)
+        header_bytes = base64.b64decode(envelope["header"])
+        ciphertext = base64.b64decode(envelope["ciphertext"])
+        signature = base64.b64decode(envelope["signature"])
+
+        try:
+            header = Header.unpack(header_bytes)
+        except Exception:
+            return cls(False, None, signature, None)
+
+        box = public.Box(box_sk, header.sender_box_pk)
+
+        try:
+            # will raise exception
+            header.sender_pk.verify(header_bytes + ciphertext, signature)
+        except exceptions.BadSignatureError:
+            return cls(False, None, signature, header)
+
+        try:
+            plaintext = box.decrypt(ciphertext)
+        except exceptions.CryptoError:
+            return cls(False, None, signature, header)
+
+        return cls(True, plaintext, signature, header)

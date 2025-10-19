@@ -51,10 +51,14 @@ async def main():
 async def inbox_poller(node: DHTNode):
     while True:
         try:
-            items = await node.pull_inbox(node.fingerprint())
-            if items:
-                for valid, header, msg in items:
-                    print(f"{'✓' if valid else 'x'} message: {str(msg)}")
+            envelopes = await node.pull_inbox(node.fingerprint())
+            if envelopes:
+                for envelope in envelopes:
+                    print(
+                        f"{'✓' if envelope.signature_valid else 'x'} message: {
+                            envelope.plaintext.decode('utf-8')
+                        }"
+                    )
         except Exception as e:
             print(f"an error occured polling the inbox: {e}")
         await asyncio.sleep(2)
@@ -86,12 +90,21 @@ async def basic_cli(node: DHTNode):
                 if contact is None:
                     print("you have to have selected a contact to chat.")
                     continue
+                if len(s) < 2:
+                    print("send used incorrectly.")
+                    print("send [your message]")
+                    continue
+
+                msg = " ".join(s[1:])
                 await node.push_inbox(
-                    contact.fingerprint(), contact.box_pk_bytes, b"Ding dong"
+                    contact.fingerprint(), contact.box_pk_bytes, bytes(msg, "utf-8")
                 )
 
+            case "fingerprint":
+                print(f"Your fingerprint: {node.fingerprint()}")
             case "exit":
                 print("Exiting")
+                node.stop()
                 break
 
 

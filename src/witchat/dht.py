@@ -112,27 +112,26 @@ class DHTNode:
             arr = []
 
         recipient_box_pk = public.PublicKey(recipient_box_pk)
-        envelope_bytes = crypto.pack_envelope(
-            self.sk, self.box_sk, recipient_box_pk, message
+
+        envelope_bytes = crypto.Envelope(plaintext=message).pack(
+            self.sk, self.box_sk, recipient_box_pk
         )
+
         arr.append(base64.b64encode(envelope_bytes).decode())
         await self.server.set(key, json.dumps(arr))
 
-    async def pull_inbox(self, fingerprint: str) -> list[bytes]:
+    async def pull_inbox(self, fingerprint: str) -> list[crypto.Envelope]:
         key = f"inbox:{fingerprint}"
         raw = await self.server.get(key) or "[]"
         try:
             arr = json.loads(raw)
         except Exception:
             arr = []
-        envelopes = [
-            (crypto.unpack_envelope(base64.b64decode(x), self.box_sk)) for x in arr
+        envelopes: list[crypto.Envelope] = [
+            (crypto.Envelope.unpack(base64.b64decode(x), self.box_sk)) for x in arr
         ]
         await self.server.set(key, json.dumps([]))
         return envelopes
-
-    def fingerprint(self):
-        return crypto.get_fingerprint(bytes(self.pk))
 
     def fingerprint(self):
         return crypto.get_fingerprint(bytes(self.pk))
