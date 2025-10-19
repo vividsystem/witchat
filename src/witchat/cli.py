@@ -2,6 +2,7 @@
 from typing import Optional
 import witchat.crypto as crypto
 from witchat.dht import DHTNode, Contact
+import socket
 import asyncio
 import uvloop
 from prompt_toolkit import PromptSession
@@ -23,7 +24,10 @@ async def main():
     port = int(input("Your host port (default: 8468):") or 8468)
     bs = input("Input IPs to connect to (format: IP:PORT, ...):")
     bootstrap: list[tuple[str, int]] = [
-        (s[0], int(s[1])) for x in bs.split(",") for s in [x.split(":")] if len(s) > 1
+        (socket.gethostbyname(s[0]), int(s[1]))
+        for x in bs.split(",")
+        for s in [x.split(":")]
+        if len(s) > 1
     ]
 
     ident_exists = crypto.identity_exists()
