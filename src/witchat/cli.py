@@ -25,7 +25,7 @@ async def main():
     bs = input("Nodes to connect to (format: IP:PORT, ...):")
     bootstrap: list[tuple[str, int]] = [
         (socket.gethostbyname(s[0]), int(s[1]))
-        for x in bs.strip().replace(" ").split(",")
+        for x in bs.strip().replace(" ", "").split(",")
         for s in [x.split(":")]
         if len(s) > 1
     ]
