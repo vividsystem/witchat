@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.2.3 (2025-10-19)
+
+### Documentation
+
+- Added desktop os requirement to README
+  ([`8c44b29`](https://github.com/vividsystem/witchat/commit/8c44b2943cf4e578e0233408db3174139f37f580))
+
+
 ## v0.2.2 (2025-10-19)
 
 ### Bug Fixes
