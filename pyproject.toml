@@ -13,8 +13,8 @@ license = { file = "LICENSE" }
 dependencies = [
     "asyncio>=4.0.0",
     "kademlia>=2.2.3",
+    "prompt-toolkit>=3.0.52",
     "pynacl>=1.6.0",
-    "textual>=6.3.0",
     "uvloop>=0.22.1",
 ]
 

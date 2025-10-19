@@ -4,6 +4,8 @@ import witchat.crypto as crypto
 from witchat.dht import DHTNode, Contact
 import asyncio
 import uvloop
+from prompt_toolkit import PromptSession
+from prompt_toolkit.patch_stdout import patch_stdout
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
@@ -23,8 +25,6 @@ async def main():
     bootstrap: list[tuple[str, int]] = [
         (s[0], int(s[1])) for x in bs.split(",") for s in [x.split(":")] if len(s) > 1
     ]
-
-    print(bootstrap)
 
     ident_exists = crypto.identity_exists()
     use_ident = False
@@ -49,15 +49,27 @@ async def main():
 
 
 async def inbox_poller(node: DHTNode):
+    await node.ready.wait()
     while True:
         try:
             envelopes = await node.pull_inbox(node.fingerprint())
             if envelopes:
                 for envelope in envelopes:
+                    sender_fingerprint = crypto.get_fingerprint(
+                        bytes(envelope.header.sender_pk)
+                    )
+                    sender = await node.lookup_contact(sender_fingerprint)
+                    if sender is None:
+                        print(
+                            f"{'✓' if envelope.signature_valid else 'x'}({
+                                sender_fingerprint
+                            })ANON: {envelope.plaintext.decode('utf-8')}"
+                        )
+                        continue
                     print(
-                        f"{'✓' if envelope.signature_valid else 'x'} message: {
-                            envelope.plaintext.decode('utf-8')
-                        }"
+                        f"{'✓' if envelope.signature_valid else 'x'} {sender.name}({
+                            sender_fingerprint
+                        }): {envelope.plaintext.decode('utf-8')}"
                     )
         except Exception as e:
             print(f"an error occured polling the inbox: {e}")
@@ -65,47 +77,50 @@ async def inbox_poller(node: DHTNode):
 
 
 async def basic_cli(node: DHTNode):
+    session = PromptSession()
     contact: Optional[Contact] = None
     while True:
-        inp = await asyncio.to_thread(
-            input, f"{crypto.get_fingerprint(contact.pk_bytes) if contact else ''}>"
-        )
+        with patch_stdout():
+            inp = await session.prompt_async(
+                f"{crypto.get_fingerprint(contact.pk_bytes) if contact else ''}> ",
+            )
         s = inp.split(" ")
+        if len(inp) == 0:
+            continue
         match s[0]:
-            case "enter":
+            case ".enter":
                 await node.publish_contact()
                 print("Contact published!")
-            case "chat":
+            case ".chat":
                 if len(s) < 2:
-                    print("enter used incorrectly.")
-                    print("enter [hexdigest of other party]")
+                    print("chat used incorrectly.")
+                    print("chat [hexdigest of other party]")
                     continue
                 contact = await node.lookup_contact(s[1])
                 if contact is None:
                     print("contact not found")
                     continue
                 print(f"name: {contact.name}")
+            case ".leave":
+                contact = None
 
-            case "send":
-                if contact is None:
-                    print("you have to have selected a contact to chat.")
-                    continue
-                if len(s) < 2:
-                    print("send used incorrectly.")
-                    print("send [your message]")
-                    continue
-
-                msg = " ".join(s[1:])
-                await node.push_inbox(
-                    contact.fingerprint(), contact.box_pk_bytes, bytes(msg, "utf-8")
-                )
-
-            case "fingerprint":
+            case ".fingerprint":
                 print(f"Your fingerprint: {node.fingerprint()}")
-            case "exit":
+            case ".exit":
                 print("Exiting")
                 node.stop()
                 break
+
+            case _:
+                if contact is None:
+                    print("you have to have selected a contact to chat.")
+                    print("use `.chat [fingerprint]`")
+                    continue
+
+                msg = " ".join(s)
+                await node.push_inbox(
+                    contact.fingerprint(), contact.box_pk_bytes, bytes(msg, "utf-8")
+                )
 
 
 def entrypoint():
@@ -113,5 +128,4 @@ def entrypoint():
 
 
 if __name__ == "__main__":
-    entrypoint()
     entrypoint()

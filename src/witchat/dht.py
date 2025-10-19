@@ -63,6 +63,7 @@ class DHTNode:
         self.box_pk = box_pk
         self.loop = None
         self._stop_event = asyncio.Event()
+        self.ready = asyncio.Event()
 
     def run(self):
         try:
@@ -80,6 +81,8 @@ class DHTNode:
 
         if self.bootstrap:
             await self.server.bootstrap(self.bootstrap)
+
+        self.ready.set()
         await self._stop_event.wait()
 
     def stop(self):
@@ -122,7 +125,7 @@ class DHTNode:
 
     async def pull_inbox(self, fingerprint: str) -> list[crypto.Envelope]:
         key = f"inbox:{fingerprint}"
-        raw = await self.server.get(key) or "[]"
+        raw = await self.server.get(key) or "[]".encode()
         try:
             arr = json.loads(raw)
         except Exception:
@@ -130,6 +133,7 @@ class DHTNode:
         envelopes: list[crypto.Envelope] = [
             (crypto.Envelope.unpack(base64.b64decode(x), self.box_sk)) for x in arr
         ]
+        # TODO: figure out race condition
         await self.server.set(key, json.dumps([]))
         return envelopes
 
