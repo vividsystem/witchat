@@ -1,7 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "ragdoll"
+name = "witchat"
 version = "0.1.0"
-description = "Add your description here"
+description = "An encrypted p2p chat app"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+authors = [{ name = "vividsystem"}]
+license = { file = "LICENSE" }
+dependencies = [
+    "asyncio>=4.0.0",
+    "kademlia>=2.2.3",
+    "prompt-toolkit>=3.0.52",
+    "pynacl>=1.6.0",
+    "uvloop>=0.22.1",
+]
+
+[project.urls]
+Repository = "https://github.com/vividsystem/witchat"
+
+[project.scripts]
+witchat = "witchat.cli:entrypoint"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/witchat"]
